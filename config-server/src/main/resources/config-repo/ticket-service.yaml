@@ -1,0 +1,40 @@
+server:
+  port: 8081
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/smartdesk_ticket_db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:2004}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+app:
+  clients:
+    api-gateway:
+      url: ${GATEWAY_URL:http://127.0.0.1:8080}
+    notification-service:
+      url: ${NOTIFICATION_URL:http://127.0.0.1:8083}
+    ai-triage-service:
+      url: ${AI_TRIAGE_URL:http://127.0.0.1:8084}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      aiTriage:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+  retry:
+    instances:
+      notify:
+        max-attempts: 3
+        wait-duration: 1s

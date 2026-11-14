@@ -1,0 +1,31 @@
+# Compiled class files & build artifacts
+target/
+**/target/
+build/
+**/build/
+dist/
+**/dist/
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# IDE & Editor files
+.idea/
+**/.idea/
+*.iml
+**/*.iml
+.vscode/
+**/.vscode/
+*.swp
+*.swo
+
+# Environment & Local secrets
+.env.local
+.env.*.local
+*.log
+**/*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db

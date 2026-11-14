@@ -1,0 +1,14 @@
+# Global Shared Configuration for all SmartDesk Microservices
+jwt:
+  secret: ${JWT_SECRET:smartdeskSecretKeyForJwtTokenGenerationMustBe256BitsLongMinimum123456}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+smartdesk:
+  internal-key: ${INTERNAL_API_KEY:dev-internal-key-change-me}
+
+eureka:
+  instance:
+    prefer-ip-address: true
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://127.0.0.1:8761/eureka/}

@@ -1,0 +1,91 @@
+package smartdesk.API_Gateway.config;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
+import smartdesk.API_Gateway.entity.Role;
+import smartdesk.API_Gateway.entity.RoleApprovalRequest;
+import smartdesk.API_Gateway.entity.User;
+import smartdesk.API_Gateway.repository.RoleApprovalRequestRepository;
+import smartdesk.API_Gateway.repository.UserRepository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * Initializes root administrator if absent and purges hardcoded dummy demo accounts,
+ * ensuring all department staff and manager listings are 100% dynamically registered users.
+ */
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class UserInitializer implements CommandLineRunner {
+
+    private final UserRepository userRepository;
+    private final RoleApprovalRequestRepository roleApprovalRequestRepository;
+
+    private static final List<String> DUMMY_EMAILS = List.of(
+            "manager@smartdesk.com",
+            "hr.manager@smartdesk.com",
+            "facilities.manager@smartdesk.com",
+            "java.manager@smartdesk.com",
+            "dotnet.manager@smartdesk.com",
+            "ai.manager@smartdesk.com",
+            "agent@smartdesk.com",
+            "hr.agent@smartdesk.com",
+            "facilities.agent@smartdesk.com",
+            "java.agent@smartdesk.com",
+            "dotnet.agent@smartdesk.com",
+            "ai.agent@smartdesk.com",
+            "employee@smartdesk.com"
+    );
+
+    @Override
+    public void run(String... args) {
+        try {
+            // 1. Purge all dummy demo accounts from the database
+            for (String email : DUMMY_EMAILS) {
+                userRepository.findByEmailIgnoreCase(email).ifPresent(user -> {
+                    try {
+                        List<RoleApprovalRequest> reqs =
+                                roleApprovalRequestRepository.findByUserOrderByCreatedAtDesc(user);
+                        if (!reqs.isEmpty()) {
+                            roleApprovalRequestRepository.deleteAll(reqs);
+                        }
+                        userRepository.delete(user);
+                        log.info("Purged dummy demo user from database: {}", email);
+                    } catch (Exception ex) {
+                        user.setIsActive(false);
+                        userRepository.save(user);
+                        log.info("Deactivated dummy demo user: {}", email);
+                    }
+                });
+            }
+
+            // 2. Ensure Root Admin account exists
+            seedUser("admin@smartdesk.com", "SmartDesk Admin", Role.ROLE_ADMIN, null, true);
+
+        } catch (Exception ex) {
+            log.warn("Database user initialization / purge encountered: {}", ex.getMessage());
+        }
+    }
+
+    private void seedUser(String email, String fullName, Role role, String dept, boolean isRootAdmin) {
+        String normalizedEmail = email.toLowerCase().trim();
+        if (!userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+            User user = User.builder()
+                    .email(normalizedEmail)
+                    .fullName(fullName)
+                    .role(role)
+                    .department(dept != null ? dept : "IT")
+                    .isRootAdmin(isRootAdmin)
+                    .isActive(true)
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            userRepository.save(user);
+            log.info("Initialized root administrator: {} ({})", normalizedEmail, role);
+        }
+    }
+}

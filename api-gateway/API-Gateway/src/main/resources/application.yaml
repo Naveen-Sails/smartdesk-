@@ -1,0 +1,74 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  config:
+    import: "optional:configserver:${CONFIG_SERVER_URL:http://127.0.0.1:8888}"
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/smartdesk_auth_db}
+    username: ${DB_USER:postgres}
+    password: 2004
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowed-origin-patterns:
+              - "http://localhost:[*]"
+              - "http://127.0.0.1:[*]"
+            allowed-methods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowed-headers: "*"
+            exposed-headers:
+              - "Authorization"
+              - "X-User-Id"
+              - "X-User-Role"
+              - "X-User-Email"
+              - "X-User-Dept"
+              - "X-User-Name"
+            allow-credentials: true
+            max-age: 3600
+
+ticket:
+  service:
+    url: ${TICKET_SERVICE_URL:http://127.0.0.1:8081}
+
+ai:
+  triage:
+    service:
+      url: ${AI_TRIAGE_SERVICE_URL:http://127.0.0.1:8084}
+
+eureka:
+  instance:
+    prefer-ip-address: true
+  client:
+    enabled: ${EUREKA_ENABLED:false}
+    register-with-eureka: ${EUREKA_ENABLED:false}
+    fetch-registry: ${EUREKA_ENABLED:false}
+    service-url:
+      defaultZone: ${EUREKA_URL:http://127.0.0.1:8761/eureka/}
+
+notification:
+  service:
+    url: ${NOTIFICATION_SERVICE_URL:http://127.0.0.1:8083}
+
+jwt:
+  secret: ${JWT_SECRET:smartdeskSecretKeyForJwtTokenGenerationMustBe256BitsLongMinimum123456}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
