@@ -1,0 +1,26 @@
+databases:
+  - name: smartdesk-db
+    databaseName: smartdesk_db
+    user: postgres
+    plan: free
+
+services:
+  - type: web
+    name: smartdesk-gateway
+    env: docker
+    dockerfilePath: api-gateway/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8080
+
+  - type: web
+    name: smartdesk-ticket-service
+    env: docker
+    dockerfilePath: ticket-service/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8081

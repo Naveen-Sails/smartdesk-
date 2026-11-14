@@ -1,8 +1,8 @@
-# Multi-stage Dockerfile for notification-service
+# Multi-stage Dockerfile for notification-service (built from repo root)
 FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
-COPY notification-service/pom.xml .
-COPY notification-service/src ./src
+COPY notification-service/notification-service/pom.xml ./pom.xml
+COPY notification-service/notification-service/src ./src
 RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:17-jre-alpine

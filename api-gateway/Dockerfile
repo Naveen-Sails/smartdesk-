@@ -1,8 +1,8 @@
-# Multi-stage Dockerfile for api-gateway
+# Multi-stage Dockerfile for api-gateway (built from repo root)
 FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
-COPY API-Gateway/pom.xml .
-COPY API-Gateway/src ./src
+COPY api-gateway/API-Gateway/pom.xml ./pom.xml
+COPY api-gateway/API-Gateway/src ./src
 RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:17-jre-alpine
