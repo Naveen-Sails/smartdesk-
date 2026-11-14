@@ -55,7 +55,7 @@ export async function requestOtpCode(email) {
       throw new Error(backendMessage)
     }
     if (error.code === 'ERR_NETWORK') {
-      throw new Error('Cannot reach API Gateway at port 8080. Please ensure the backend is running.')
+      throw new Error('Cannot reach API Gateway. Please ensure the backend is running and connected.')
     }
     throw new Error('Failed to request verification code. Please try again.')
   }
@@ -107,7 +107,7 @@ export async function verifyOtpCode(email, otp, expectedRole) {
       throw new Error(backendMessage)
     }
     if (error.code === 'ERR_NETWORK') {
-      throw new Error('Cannot reach API Gateway at port 8080. Please check your backend connection.')
+      throw new Error('Cannot reach API Gateway. Please check your backend connection.')
     }
     throw new Error('Verification failed. Please check your code and try again.')
   }
@@ -141,7 +141,7 @@ export async function requestRegistrationOtp({ name, email, role, department }) 
       throw new Error(backendMessage)
     }
     if (error.code === 'ERR_NETWORK') {
-      throw new Error('Cannot reach API Gateway at port 8080. Please ensure the backend is running.')
+      throw new Error('Cannot reach API Gateway. Please ensure the backend is running and connected.')
     }
     throw new Error('Failed to request registration code. Please try again.')
   }
@@ -193,7 +193,7 @@ export async function verifyRegistrationOtp(email, otp, expectedRole) {
       throw new Error(backendMessage)
     }
     if (error.code === 'ERR_NETWORK') {
-      throw new Error('Cannot reach API Gateway at port 8080. Please check your backend connection.')
+      throw new Error('Cannot reach API Gateway. Please check your backend connection.')
     }
     throw new Error('Registration verification failed. Please check your code.')
   }
