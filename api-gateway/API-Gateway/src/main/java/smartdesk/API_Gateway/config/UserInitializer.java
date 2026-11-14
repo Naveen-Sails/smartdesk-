@@ -63,38 +63,46 @@ public class UserInitializer implements CommandLineRunner {
                 });
             }
 
-            // 2. Ensure Root Admin accounts exist and are elevated
-            seedOrUpdateAdmin("admin@smartdesk.com", "SmartDesk Admin", Role.ROLE_ADMIN, "IT", true);
-            seedOrUpdateAdmin("naveenmoka2004@gmail.com", "Moka Naveen", Role.ROLE_ADMIN, "Engineering", true);
+            // 2. Ensure Root Admin accounts exist
+            seedUser("admin@smartdesk.com", "SmartDesk Admin", Role.ROLE_ADMIN, "IT", true);
+            seedUser("adminsails@gmail.com", "Moka Naveen", Role.ROLE_ADMIN, "Engineering", true);
+            seedUser("naveenmoka2004@gmail.com", "Moka Naveen", Role.ROLE_ADMIN, "Engineering", true);
 
         } catch (Exception ex) {
             log.warn("Database user initialization / purge encountered: {}", ex.getMessage());
         }
     }
 
-    private void seedOrUpdateAdmin(String email, String fullName, Role role, String dept, boolean isRootAdmin) {
+    private void seedUser(String email, String fullName, Role role, String dept, boolean isRootAdmin) {
         String normalizedEmail = email.toLowerCase().trim();
-        userRepository.findByEmailIgnoreCase(normalizedEmail).ifPresentOrElse(user -> {
-            user.setFullName(fullName);
-            user.setRole(role);
-            user.setDepartment(dept != null ? dept : "IT");
-            user.setIsRootAdmin(isRootAdmin);
-            user.setIsActive(true);
-            user.setUpdatedAt(LocalDateTime.now());
-            userRepository.save(user);
+        java.util.Optional<User> existingUserOpt = userRepository.findByEmailIgnoreCase(normalizedEmail);
+        if (existingUserOpt.isPresent()) {
+            User existing = existingUserOpt.get();
+            existing.setFullName(fullName);
+            existing.setRole(role);
+            existing.setDepartment(dept != null ? dept : "Engineering");
+            existing.setIsRootAdmin(isRootAdmin);
+            existing.setIsActive(true);
+            existing.setUpdatedAt(LocalDateTime.now());
+            userRepository.save(existing);
+            log.info("Updated root administrator: {} ({})", normalizedEmail, role);
 
-            // Clean up any pending role approval requests so the admin workspace is unblocked
-            List<RoleApprovalRequest> reqs = roleApprovalRequestRepository.findByUserOrderByCreatedAtDesc(user);
-            if (!reqs.isEmpty()) {
-                roleApprovalRequestRepository.deleteAll(reqs);
+            // Clean up any pending role requests for this admin account
+            try {
+                List<RoleApprovalRequest> reqs = roleApprovalRequestRepository.findByUserOrderByCreatedAtDesc(existing);
+                if (!reqs.isEmpty()) {
+                    roleApprovalRequestRepository.deleteAll(reqs);
+                    log.info("Cleared prior role requests for seeded admin: {}", normalizedEmail);
+                }
+            } catch (Exception ex) {
+                log.warn("Could not clear role requests for {}: {}", normalizedEmail, ex.getMessage());
             }
-            log.info("Elevated / verified root administrator: {} ({})", normalizedEmail, role);
-        }, () -> {
+        } else {
             User user = User.builder()
                     .email(normalizedEmail)
                     .fullName(fullName)
                     .role(role)
-                    .department(dept != null ? dept : "IT")
+                    .department(dept != null ? dept : "Engineering")
                     .isRootAdmin(isRootAdmin)
                     .isActive(true)
                     .createdAt(LocalDateTime.now())
@@ -102,6 +110,6 @@ public class UserInitializer implements CommandLineRunner {
                     .build();
             userRepository.save(user);
             log.info("Initialized root administrator: {} ({})", normalizedEmail, role);
-        });
+        }
     }
 }
