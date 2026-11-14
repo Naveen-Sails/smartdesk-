@@ -63,17 +63,33 @@ public class UserInitializer implements CommandLineRunner {
                 });
             }
 
-            // 2. Ensure Root Admin account exists
-            seedUser("admin@smartdesk.com", "SmartDesk Admin", Role.ROLE_ADMIN, null, true);
+            // 2. Ensure Root Admin accounts exist and are elevated
+            seedOrUpdateAdmin("admin@smartdesk.com", "SmartDesk Admin", Role.ROLE_ADMIN, "IT", true);
+            seedOrUpdateAdmin("naveenmoka2004@gmail.com", "Moka Naveen", Role.ROLE_ADMIN, "Engineering", true);
 
         } catch (Exception ex) {
             log.warn("Database user initialization / purge encountered: {}", ex.getMessage());
         }
     }
 
-    private void seedUser(String email, String fullName, Role role, String dept, boolean isRootAdmin) {
+    private void seedOrUpdateAdmin(String email, String fullName, Role role, String dept, boolean isRootAdmin) {
         String normalizedEmail = email.toLowerCase().trim();
-        if (!userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+        userRepository.findByEmailIgnoreCase(normalizedEmail).ifPresentOrElse(user -> {
+            user.setFullName(fullName);
+            user.setRole(role);
+            user.setDepartment(dept != null ? dept : "IT");
+            user.setIsRootAdmin(isRootAdmin);
+            user.setIsActive(true);
+            user.setUpdatedAt(LocalDateTime.now());
+            userRepository.save(user);
+
+            // Clean up any pending role approval requests so the admin workspace is unblocked
+            List<RoleApprovalRequest> reqs = roleApprovalRequestRepository.findByUserOrderByCreatedAtDesc(user);
+            if (!reqs.isEmpty()) {
+                roleApprovalRequestRepository.deleteAll(reqs);
+            }
+            log.info("Elevated / verified root administrator: {} ({})", normalizedEmail, role);
+        }, () -> {
             User user = User.builder()
                     .email(normalizedEmail)
                     .fullName(fullName)
@@ -86,6 +102,6 @@ public class UserInitializer implements CommandLineRunner {
                     .build();
             userRepository.save(user);
             log.info("Initialized root administrator: {} ({})", normalizedEmail, role);
-        }
+        });
     }
 }
