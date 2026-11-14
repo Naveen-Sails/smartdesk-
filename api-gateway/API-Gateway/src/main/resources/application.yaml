@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 spring:
   application:
@@ -9,7 +9,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/smartdesk_auth_db}
     username: ${DB_USER:postgres}
-    password: 2004
+    password: ${DB_PASSWORD:2004}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -28,6 +28,8 @@ spring:
             allowed-origin-patterns:
               - "http://localhost:[*]"
               - "http://127.0.0.1:[*]"
+              - "https://*.vercel.app"
+              - "https://*.onrender.com"
             allowed-methods:
               - GET
               - POST
