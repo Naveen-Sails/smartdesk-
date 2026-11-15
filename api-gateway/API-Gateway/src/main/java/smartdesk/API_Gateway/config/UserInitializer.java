@@ -63,10 +63,22 @@ public class UserInitializer implements CommandLineRunner {
                 });
             }
 
-            // 2. Ensure Root Admin accounts exist
-            seedUser("admin@smartdesk.com", "SmartDesk Admin", Role.ROLE_ADMIN, "IT", true);
-            seedUser("adminsails@gmail.com", "Moka Naveen", Role.ROLE_ADMIN, "Engineering", true);
-            seedUser("naveenmoka2004@gmail.com", "Moka Naveen", Role.ROLE_ADMIN, "Engineering", true);
+            // 2. Ensure strictly ONE Root Admin account exists (pre-seeded: adminsails@gmail.com)
+            String soleAdminEmail = "adminsails@gmail.com";
+            seedUser(soleAdminEmail, "Moka Naveen", Role.ROLE_ADMIN, "Engineering", true);
+
+            // 3. Demote or reassign any duplicate admin accounts so exactly ONE admin exists
+            List<User> otherAdmins = userRepository.findAll().stream()
+                    .filter(u -> !soleAdminEmail.equalsIgnoreCase(u.getEmail()) &&
+                            (u.getRole() == Role.ROLE_ADMIN || Boolean.TRUE.equals(u.getIsRootAdmin())))
+                    .toList();
+            for (User otherAdmin : otherAdmins) {
+                otherAdmin.setRole(Role.ROLE_EMPLOYEE);
+                otherAdmin.setIsRootAdmin(false);
+                otherAdmin.setUpdatedAt(LocalDateTime.now());
+                userRepository.save(otherAdmin);
+                log.info("Demoted duplicate admin account '{}' to ROLE_EMPLOYEE to enforce single admin role", otherAdmin.getEmail());
+            }
 
         } catch (Exception ex) {
             log.warn("Database user initialization / purge encountered: {}", ex.getMessage());

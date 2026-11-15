@@ -7,7 +7,7 @@ import { DEPARTMENTS } from '../../features/auth/authService.js'
 import { ROLE_NAVIGATION } from '../../routes/navigation.js'
 import { ROLES } from '../../context/roles.js'
 
-function AuthFormPage({ role, mode }) {
+function AuthFormPage({ role = ROLES.EMPLOYEE, mode }) {
   const navigate = useNavigate()
   const {
     requestOtp,
@@ -32,8 +32,9 @@ function AuthFormPage({ role, mode }) {
   const [usePasswordFallback, setUsePasswordFallback] = useState(false)
 
   const isSignup = mode === 'signup'
-  const roleDetails = ROLE_NAVIGATION[role]
-  const isDepartmentRole = role === ROLES.AGENT || role === ROLES.MANAGER
+  const activeRole = role || ROLES.EMPLOYEE
+  const roleDetails = ROLE_NAVIGATION[activeRole] || ROLE_NAVIGATION[ROLES.EMPLOYEE]
+  const isDepartmentRole = activeRole === ROLES.AGENT || activeRole === ROLES.MANAGER
 
   // Cooldown countdown timer
   useEffect(() => {
@@ -60,7 +61,7 @@ function AuthFormPage({ role, mode }) {
         await requestRegistrationOtp({
           name: form.name,
           email: form.email,
-          role,
+          role: activeRole,
           department: isDepartmentRole ? form.department : 'IT',
         })
         toast.success('Registration code dispatched. Check your inbox or Gateway terminal.')
@@ -87,10 +88,10 @@ function AuthFormPage({ role, mode }) {
     try {
       let user
       if (isSignup) {
-        user = await verifyRegistrationOtp(form.email, form.otp, role)
-        if (user.role === ROLES.EMPLOYEE && role !== ROLES.EMPLOYEE) {
+        user = await verifyRegistrationOtp(form.email, form.otp, activeRole)
+        if (user.role === ROLES.EMPLOYEE && activeRole !== ROLES.EMPLOYEE) {
           toast.info(
-            `Account verified! You have Employee access while your request for ${roleDetails.label} (${form.department || 'IT'}) is pending approval by your ${role === ROLES.MANAGER ? 'Admin' : 'Department Manager'}.`,
+            `Account verified! You have Employee access while your request for ${roleDetails.label} (${form.department || 'IT'}) is pending approval by your ${activeRole === ROLES.MANAGER ? 'Admin' : 'Department Manager'}.`,
             { duration: 7000 }
           )
           navigate('/employee', { replace: true })
@@ -99,9 +100,10 @@ function AuthFormPage({ role, mode }) {
         toast.success(`Account verified & created! Welcome, ${user.name}!`)
         navigate(roleDetails.homePath, { replace: true })
       } else {
-        user = await verifyOtp(form.email, form.otp, role)
-        toast.success(`Welcome back to your ${roleDetails.label} workspace, ${user.name}!`)
-        navigate(roleDetails.homePath, { replace: true })
+        user = await verifyOtp(form.email, form.otp)
+        const targetNav = ROLE_NAVIGATION[user.role] || ROLE_NAVIGATION[ROLES.EMPLOYEE]
+        toast.success(`Welcome back to your ${targetNav.label} workspace, ${user.name}!`)
+        navigate(targetNav.homePath, { replace: true })
       }
     } catch (err) {
       setError(err.message)
@@ -118,13 +120,15 @@ function AuthFormPage({ role, mode }) {
 
     try {
       if (isSignup) {
-        signUp({ ...form, role })
+        signUp({ ...form, role: activeRole })
         toast.success('Account created. Welcome to SmartDesk!')
+        navigate('/employee', { replace: true })
       } else {
-        signIn(form.email, form.password, role)
-        toast.success(`Welcome back to your ${roleDetails.label} workspace.`)
+        const loggedInUser = signIn(form.email, form.password)
+        const targetNav = ROLE_NAVIGATION[loggedInUser?.role] || roleDetails
+        toast.success(`Welcome back to your ${targetNav.label} workspace.`)
+        navigate(targetNav.homePath, { replace: true })
       }
-      navigate(roleDetails.homePath, { replace: true })
     } catch (authError) {
       setError(authError.message)
       if (!isSignup) toast.error('Could not sign in with those details.')
@@ -133,20 +137,19 @@ function AuthFormPage({ role, mode }) {
 
   return (
     <div>
-      <p className="text-sm font-medium text-neutral-500">{roleDetails.label} workspace</p>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-900">
+      <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
         {step === 'otp'
           ? 'Enter verification code'
           : isSignup
-            ? 'Create your account'
+            ? `Sign up as ${roleDetails.label}`
             : 'Sign in to SmartDesk'}
       </h1>
-      <p className="mt-2 text-sm leading-5 text-neutral-500">
+      <p className="mt-1.5 text-sm leading-5 text-neutral-500">
         {step === 'otp'
           ? `We sent a 6-digit verification code to ${form.email}.`
           : isSignup
-            ? `Enter your details to receive an account activation code.`
-            : `Enter your email to receive a secure login code.`}
+            ? `Fill in your details below to activate your ${roleDetails.label.toLowerCase()} account.`
+            : `Enter your email address to receive a secure login code.`}
       </p>
 
       {/* --- Case 1: Standard OTP Registration / Login (Step 1: Input details) --- */}
@@ -189,22 +192,29 @@ function AuthFormPage({ role, mode }) {
           </label>
 
           {isSignup && isDepartmentRole && (
-            <label className="block space-y-1.5">
-              <span className="text-xs font-medium text-neutral-700">Department</span>
-              <span className="relative block">
-                <Building2 aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={16} />
-                <select
-                  className="h-11 w-full rounded-lg border border-neutral-200 bg-white pl-10 pr-3 text-sm text-neutral-800 outline-none focus:border-neutral-400"
-                  name="department"
-                  onChange={updateField}
-                  value={form.department}
-                >
-                  {DEPARTMENTS.map((dept) => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-              </span>
-            </label>
+            <div className="space-y-2">
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium text-neutral-700">Department</span>
+                <span className="relative block">
+                  <Building2 aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={16} />
+                  <select
+                    className="h-11 w-full rounded-lg border border-neutral-200 bg-white pl-10 pr-3 text-sm text-neutral-800 outline-none focus:border-neutral-400 cursor-pointer"
+                    name="department"
+                    onChange={updateField}
+                    value={form.department}
+                  >
+                    {DEPARTMENTS.map((dept) => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                </span>
+              </label>
+              <div className="rounded-lg bg-amber-50 border border-amber-200/80 p-2.5 text-xs text-amber-800 leading-relaxed">
+                {activeRole === ROLES.MANAGER
+                  ? 'Department Manager accounts require review and approval by the Administrator.'
+                  : 'Support Agent accounts require review and approval by your Department Manager.'}
+              </div>
+            </div>
           )}
 
           {error && <p aria-live="polite" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
@@ -239,7 +249,7 @@ function AuthFormPage({ role, mode }) {
               <span className="font-medium text-neutral-800">{form.email}</span>
             </div>
             <button
-              className="inline-flex items-center gap-1 text-xs text-neutral-600 hover:text-neutral-900 font-medium"
+              className="inline-flex items-center gap-1 text-xs text-neutral-600 hover:text-neutral-900 font-medium cursor-pointer"
               onClick={() => { setStep('email'); setForm((f) => ({ ...f, otp: '' })); setError(''); }}
               type="button"
             >

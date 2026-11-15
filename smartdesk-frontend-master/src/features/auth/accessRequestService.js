@@ -58,3 +58,8 @@ export async function submitRoleUpgradeRequest(requestedRole, department) {
   })
   return res.data
 }
+
+export async function updateStaffDepartment(userId, department) {
+  const res = await api.patch(`/v1/access-requests/staff/${userId}/department`, { department })
+  return res.data
+}

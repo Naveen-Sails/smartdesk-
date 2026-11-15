@@ -70,6 +70,8 @@ function WorkspaceRoutes() {
   return (
     <Routes>
       <Route element={<AuthHomePage />} path="/" />
+      <Route element={<GuestRoute><AuthLandingPage initialMode="login" /></GuestRoute>} path="/login" />
+      <Route element={<GuestRoute><AuthLandingPage initialMode="signup" /></GuestRoute>} path="/signup" />
       <Route element={<GuestRoute><AuthLandingPage initialMode="login" /></GuestRoute>} path="/login/:role" />
       <Route element={<GuestRoute><AuthLandingPage initialMode="signup" /></GuestRoute>} path="/signup/:role" />
       <Route element={<RequireAuth />}>

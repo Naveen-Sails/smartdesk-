@@ -165,7 +165,8 @@ public class OtpAuthServiceImpl implements OtpAuthService {
         Optional<User> existingUserOpt = userRepository.findByEmailIgnoreCase(sanitizedEmail);
         User user;
 
-        Role baseRole = Boolean.TRUE.equals(request.getIsRootAdmin()) ? Role.ROLE_ADMIN : Role.ROLE_EMPLOYEE;
+        // Only one admin exists in the system (pre-seeded). All public registrations are strictly EMPLOYEE.
+        Role baseRole = Role.ROLE_EMPLOYEE;
         if (existingUserOpt.isPresent()) {
             User existingUser = existingUserOpt.get();
             // If user is already active, reject registration
@@ -176,17 +177,18 @@ public class OtpAuthServiceImpl implements OtpAuthService {
             // User exists but inactive (e.g. unfinished prior registration): update profile details
             existingUser.setFullName(request.getFullName() != null ? request.getFullName().trim() : existingUser.getFullName());
             existingUser.setRole(baseRole);
+            existingUser.setIsRootAdmin(false);
             existingUser.setDepartment(request.getDepartment());
             user = userRepository.save(existingUser);
             log.info("Updated existing inactive user record ID: {} for re-registration with base role {}", user.getId(), baseRole);
         } else {
-            // Create pending user (inactive until OTP verified), defaulting role to EMPLOYEE
+            // Create pending user (inactive until OTP verified), strictly defaulting to EMPLOYEE
             User newUser = User.builder()
                     .fullName(request.getFullName() != null ? request.getFullName().trim() : "New User")
                     .email(sanitizedEmail)
                     .role(baseRole)
                     .department(request.getDepartment())
-                    .isRootAdmin(Boolean.TRUE.equals(request.getIsRootAdmin()))
+                    .isRootAdmin(false)
                     .isActive(false) // Pending activation
                     .build();
             user = userRepository.save(newUser);
@@ -194,7 +196,10 @@ public class OtpAuthServiceImpl implements OtpAuthService {
         }
 
         // If user requested a privileged role (AGENT or MANAGER), submit a pending access request
-        if (request.getRole() != null && request.getRole() != Role.ROLE_EMPLOYEE && !Boolean.TRUE.equals(request.getIsRootAdmin())) {
+        // Note: Admin cannot be requested via registration
+        if (request.getRole() != null &&
+                request.getRole() != Role.ROLE_EMPLOYEE &&
+                request.getRole() != Role.ROLE_ADMIN) {
             Optional<RoleApprovalRequest> existingReqOpt = roleApprovalRequestRepository
                     .findTopByUserAndStatusOrderByCreatedAtDesc(user, ApprovalStatus.PENDING);
             RoleApprovalRequest approvalReq = existingReqOpt.orElseGet(() -> RoleApprovalRequest.builder()

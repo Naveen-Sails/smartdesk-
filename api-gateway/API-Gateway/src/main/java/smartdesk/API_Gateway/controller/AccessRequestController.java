@@ -15,6 +15,7 @@ import smartdesk.API_Gateway.repository.UserRepository;
 import smartdesk.API_Gateway.security.JwtUtil;
 import smartdesk.API_Gateway.service.AccessRequestService;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -241,5 +242,43 @@ public class AccessRequestController {
                 .toList();
 
         return ResponseEntity.ok(dtos);
+    }
+
+    @PatchMapping("/staff/{userId}/department")
+    public ResponseEntity<?> updateStaffDepartment(
+            @PathVariable UUID userId,
+            @RequestBody Map<String, String> body,
+            @RequestHeader(value = "X-User-Id", required = false) String rawUserId,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+
+        User caller = resolveCaller(rawUserId, authHeader);
+        if (caller == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Unauthorized: User session required"));
+        }
+
+        if (caller.getRole() != Role.ROLE_ADMIN) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Forbidden: Only Administrator can reassign staff departments"));
+        }
+
+        String newDepartment = body.get("department");
+        if (newDepartment == null || newDepartment.trim().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Department name is required"));
+        }
+
+        User target = userRepository.findById(userId).orElse(null);
+        if (target == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Staff member not found with ID: " + userId));
+        }
+
+        target.setDepartment(newDepartment.trim());
+        target.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(target);
+
+        log.info("Admin '{}' updated department for '{}' ({}) to '{}'",
+                caller.getEmail(), target.getEmail(), target.getRole(), newDepartment.trim());
+
+        return ResponseEntity.ok(StaffMemberDTO.fromEntity(target));
     }
 }

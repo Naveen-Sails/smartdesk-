@@ -10,6 +10,7 @@ import {
   fetchActiveDepartmentStaff,
   approveAccessRequest,
   rejectAccessRequest,
+  updateStaffDepartment,
 } from '../../features/auth/accessRequestService.js'
 
 function TeamPage() {
@@ -22,6 +23,7 @@ function TeamPage() {
   const [staff, setStaff] = useState([])
   const [loadingStaff, setLoadingStaff] = useState(true)
   const [actionInProgress, setActionInProgress] = useState(null)
+  const [updatingDeptUserId, setUpdatingDeptUserId] = useState(null)
 
   useEffect(() => {
     loadRequests()
@@ -78,6 +80,23 @@ function TeamPage() {
       toast.error(err.response?.data?.error || err.message || 'Failed to reject request')
     } finally {
       setActionInProgress(null)
+    }
+  }
+
+  async function handleDepartmentChange(member, newDepartment) {
+    if (!newDepartment || newDepartment === member.department) return
+    setUpdatingDeptUserId(member.id)
+    try {
+      await updateStaffDepartment(member.id, newDepartment)
+      const roleLabel = (member.role === 'ROLE_MANAGER' || member.role === ROLES.MANAGER) ? 'Manager' : 'Support Agent'
+      toast.success(`Reassigned ${member.name} (${roleLabel}) to ${newDepartment} department.`)
+      setStaff((prev) =>
+        prev.map((s) => (s.id === member.id ? { ...s, department: newDepartment } : s))
+      )
+    } catch (err) {
+      toast.error(err.response?.data?.error || err.message || 'Failed to update department')
+    } finally {
+      setUpdatingDeptUserId(null)
     }
   }
 
@@ -250,10 +269,33 @@ function TeamPage() {
                     </span>
                     <div>
                       <p className="text-sm font-medium text-neutral-900">{member.name}</p>
-                      <p className="mt-0.5 text-xs text-neutral-500">
-                        {roleLabel} · {member.department || 'IT'}
-                        <span className="ml-2 text-neutral-400 font-mono text-[11px]">{member.email}</span>
-                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                        <span className="font-semibold text-neutral-800">{roleLabel}</span>
+                        {isAdmin ? (
+                          <div className="inline-flex items-center gap-1">
+                            <span className="text-neutral-400">· Dept:</span>
+                            <select
+                              aria-label={`Change department for ${member.name}`}
+                              className="h-6 rounded-md border border-neutral-300 bg-white px-1.5 py-0 text-xs font-medium text-neutral-800 shadow-2xs hover:border-neutral-400 focus:border-neutral-900 focus:outline-none cursor-pointer disabled:opacity-50"
+                              disabled={updatingDeptUserId === member.id}
+                              onChange={(e) => handleDepartmentChange(member, e.target.value)}
+                              value={member.department || 'IT'}
+                            >
+                              {['IT', 'HR', 'Facilities', 'Engineering', 'Finance', 'Operations'].map((dept) => (
+                                <option key={dept} value={dept}>
+                                  {dept}
+                                </option>
+                              ))}
+                            </select>
+                            {updatingDeptUserId === member.id && (
+                              <span className="text-[10px] text-neutral-400 animate-pulse">Saving...</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-neutral-500">· {member.department || 'IT'}</span>
+                        )}
+                        <span className="text-neutral-400 font-mono text-[11px]">({member.email})</span>
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-4 sm:justify-end">
