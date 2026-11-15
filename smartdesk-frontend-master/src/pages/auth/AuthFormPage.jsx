@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Building2, KeyRound, LockKeyhole, Mail, RotateCw, Send, UserRound } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, ArrowRight, Building2, KeyRound, LockKeyhole, Mail, RotateCw, Send, UserRound } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuth } from '../../features/auth/useAuth.js'
 import { DEPARTMENTS } from '../../features/auth/authService.js'
@@ -231,7 +231,21 @@ function AuthFormPage({ role = ROLES.EMPLOYEE, mode }) {
             </div>
           )}
 
-          {error && <p aria-live="polite" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+          {error && (
+            <div aria-live="polite" className="rounded-lg bg-red-50 p-3 text-xs text-red-700 space-y-1.5">
+              <p className="font-medium">{error}</p>
+              {!isSignup && error.toLowerCase().includes('sign up') && (
+                <div className="pt-1">
+                  <Link
+                    className="inline-flex items-center gap-1 font-semibold text-red-800 underline hover:text-red-950"
+                    to="/signup"
+                  >
+                    Don&apos;t have an account? Sign up here <ArrowRight size={13} />
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
 
           <button
             className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-neutral-900 text-sm font-medium text-white transition hover:bg-neutral-700 disabled:opacity-50"
@@ -368,7 +382,21 @@ function AuthFormPage({ role = ROLES.EMPLOYEE, mode }) {
             </span>
           </label>
 
-          {error && <p aria-live="polite" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+          {error && (
+            <div aria-live="polite" className="rounded-lg bg-red-50 p-3 text-xs text-red-700 space-y-1.5">
+              <p className="font-medium">{error}</p>
+              {!isSignup && error.toLowerCase().includes('sign up') && (
+                <div className="pt-1">
+                  <Link
+                    className="inline-flex items-center gap-1 font-semibold text-red-800 underline hover:text-red-950"
+                    to="/signup"
+                  >
+                    Don&apos;t have an account? Sign up here <ArrowRight size={13} />
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
 
           <button className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-neutral-900 text-sm font-medium text-white transition hover:bg-neutral-700" type="submit">
             {isSignup ? 'Create account (Password)' : 'Sign In with Password'}

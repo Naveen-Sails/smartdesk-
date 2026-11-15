@@ -52,13 +52,16 @@ public class OtpAuthServiceImpl implements OtpAuthService {
 
         Optional<User> userOptional = userRepository.findByEmailIgnoreCase(sanitizedEmail);
 
-        // Prevent email enumeration: return generic success if user does not exist or is inactive
-        if (userOptional.isEmpty() || !Boolean.TRUE.equals(userOptional.get().getIsActive())) {
-            log.info("User with email '{}' not found or inactive. Returning generic response.", sanitizedEmail);
-            return;
+        if (userOptional.isEmpty()) {
+            log.warn("Login OTP request rejected: no account exists for email '{}'", sanitizedEmail);
+            throw new IllegalArgumentException("No account found with this email. Please sign up first.");
         }
 
         User user = userOptional.get();
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            log.warn("Login OTP request rejected: account '{}' is inactive or pending activation", sanitizedEmail);
+            throw new IllegalArgumentException("Your account is registered but pending activation. Please complete verification or contact your administrator.");
+        }
 
         // Rate limiting check: reject if last OTP was requested less than 60 seconds ago
         Optional<OtpVerification> lastOtpOpt = otpVerificationRepository.findTopByUserOrderByCreatedAtDesc(user);

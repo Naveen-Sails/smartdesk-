@@ -14,9 +14,9 @@ function ManagerDashboard() {
   const activeTickets = visibleTickets.filter((ticket) => ticket.status !== 'Closed')
   const highPriorityTickets = activeTickets.filter((ticket) => ticket.priority === 'High')
   const resolvedTickets = visibleTickets.filter((ticket) => ticket.status === 'Closed')
-  const statusData = ['Open', 'In progress', 'Waiting on employee', 'Resolved', 'Closed'].map((status) => ({
+  const statusData = ['Open', 'In Progress', 'Waiting on employee', 'Resolved', 'Closed'].map((status) => ({
     status,
-    count: visibleTickets.filter((ticket) => ticket.status === status).length,
+    count: visibleTickets.filter((ticket) => ticket.status?.toLowerCase() === status.toLowerCase()).length,
   }))
   const recentTickets = [...visibleTickets].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).slice(0, 4)
 

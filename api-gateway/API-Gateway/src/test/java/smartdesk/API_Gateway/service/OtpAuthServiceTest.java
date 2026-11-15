@@ -68,22 +68,26 @@ class OtpAuthServiceTest {
     }
 
     @Test
-    void testRequestOtp_UserNotFound_ReturnsSilentlyWithoutCreatingOtp() {
+    void testRequestOtp_UserNotFound_ThrowsIllegalArgumentException() {
         when(userRepository.findByEmailIgnoreCase("unknown@sailssoftware.com")).thenReturn(Optional.empty());
 
-        assertDoesNotThrow(() -> otpAuthService.requestOtp("unknown@sailssoftware.com"));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> otpAuthService.requestOtp("unknown@sailssoftware.com"));
 
+        assertTrue(ex.getMessage().contains("Please sign up first"));
         verify(otpVerificationRepository, never()).save(any());
         verify(notificationClient, never()).sendOtpNotificationAsync(anyString(), anyString());
     }
 
     @Test
-    void testRequestOtp_UserInactive_ReturnsSilentlyWithoutCreatingOtp() {
+    void testRequestOtp_UserInactive_ThrowsIllegalArgumentException() {
         activeUser.setIsActive(false);
         when(userRepository.findByEmailIgnoreCase("alice@sailssoftware.com")).thenReturn(Optional.of(activeUser));
 
-        assertDoesNotThrow(() -> otpAuthService.requestOtp("alice@sailssoftware.com"));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> otpAuthService.requestOtp("alice@sailssoftware.com"));
 
+        assertTrue(ex.getMessage().contains("pending activation"));
         verify(otpVerificationRepository, never()).save(any());
         verify(notificationClient, never()).sendOtpNotificationAsync(anyString(), anyString());
     }
