@@ -31,9 +31,12 @@ public class TicketMapper {
         TriageSource source = (a != null && a.getSource() != null) ? a.getSource() : TriageSource.FALLBACK;
         TicketAssignment as = t.getAssignment(); // null until claimed/assigned
         UUID agent = as == null ? null : as.getAgentId();
+        UserContact requester = t.getCreatedBy() == null ? null : users.find(t.getCreatedBy());
+        String requesterName = requester == null ? null : requester.name();
+        String requesterEmail = requester == null ? null : requester.email();
         return new TicketResponse(t.getTicketId(), t.getTitle(), t.getDescription(), t.getStatus(),
                 t.getDepartmentName(), category, priority, summary, source,
-                t.getCreatedBy(), name(t.getCreatedBy()), agent, name(agent),
+                t.getCreatedBy(), requesterName, requesterEmail, agent, name(agent),
                 incidents.incidentIdOf(t), t.getReportCount(), t.getCreatedAt(), t.getResolvedAt());
     }
 

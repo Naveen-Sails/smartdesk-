@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { ROLES } from '../../context/roles.js'
 import { useAuth } from '../auth/useAuth.js'
 import { useTickets } from './useTickets.js'
+import { isUserTicket } from './ticketStore.js'
 import { AGENT_TICKET_STATUSES } from './demoTickets.js'
 import TicketStatusBadge from './TicketStatusBadge.jsx'
 import PriorityBadge from './PriorityBadge.jsx'
@@ -45,7 +46,7 @@ function TicketDetailPage() {
 
   const ticket = ticketFromContext || fetchedTicket
 
-  const isRequester = !ticket?.requesterEmail || ticket.requesterEmail === user.email || ticket.requester === user.name || ticket.requesterId === user.id
+  const isRequester = isUserTicket(ticket, user)
   const isEmployeeMatch = role === ROLES.EMPLOYEE && isRequester
   const isManagerMatch = role === ROLES.MANAGER && (
     !user.department || ticket?.department === user.department
@@ -55,13 +56,13 @@ function TicketDetailPage() {
   ) && (!ticket?.assignee || ticket.assignee === user.name)
 
   const canViewTicket = ticket && (
-    role === ROLES.ADMIN || isRequester || isManagerMatch || isEmployeeMatch || isAgentMatch
+    role === ROLES.ADMIN || isRequester || isManagerMatch || isAgentMatch || isEmployeeMatch
   )
   const [comment, setComment] = useState('')
 
-  const isMyRequestView = pathname.includes('/my-requests')
-  const backPath = isMyRequestView
-    ? (role === ROLES.EMPLOYEE ? '/employee/tickets' : `/${role.toLowerCase()}/my-requests`)
+  const userRoleBase = role === ROLES.ADMIN ? 'admin' : role === ROLES.MANAGER ? 'manager' : role === ROLES.AGENT ? 'agent' : 'employee'
+  const backPath = isRequester && (pathname.includes('/my-requests') || (!isManagerMatch && !isAgentMatch))
+    ? `/${userRoleBase}/my-requests`
     : role === ROLES.EMPLOYEE
       ? '/employee/tickets'
       : role === ROLES.MANAGER
@@ -95,7 +96,7 @@ function TicketDetailPage() {
 
   const canClaim = role === ROLES.AGENT && !ticket.assignee && ticket.status !== 'Closed'
   const canUpdate = role === ROLES.AGENT && ticket.assignee === user.name && ticket.status !== 'Closed'
-  const canComment = ticket.status !== 'Closed' && (canUpdate || role === ROLES.EMPLOYEE || isRequester || role === ROLES.ADMIN)
+  const canComment = ticket.status !== 'Closed' && (canUpdate || role === ROLES.EMPLOYEE || isRequester)
 
   function handleComment(event) {
     event.preventDefault()
@@ -237,7 +238,7 @@ function TicketDetailPage() {
             </section>
           )}
 
-          {(role === ROLES.EMPLOYEE || isRequester) && ticket.status === 'Resolved' && (
+          {(isRequester || role === ROLES.EMPLOYEE) && ticket.status === 'Resolved' && (
             <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
               <h2 className="text-sm font-semibold text-emerald-900">Please confirm the resolution</h2>
               <p className="mt-1 text-xs leading-5 text-emerald-800">Review the agent’s update. Acknowledging it will close this ticket.</p>

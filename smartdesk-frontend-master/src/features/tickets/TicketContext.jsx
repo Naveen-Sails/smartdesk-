@@ -28,8 +28,16 @@ export function normalizeBackendTicket(t, currentUser) {
   const displayPriority = PRIORITY_MAP[t.priority] || t.priority || 'Medium'
   const displayDepartment = t.department || t.category || 'IT'
   const idStr = typeof t.id === 'number' ? `SD-${t.id}` : (t.id || 'SD-1')
-  const reqEmail = t.requesterEmail || currentUser?.email || ''
-  const reqName = t.requesterName || t.requester || currentUser?.name || 'Employee'
+
+  const isCurrentUserCreator = Boolean(
+    (t.requesterId && currentUser?.id && String(t.requesterId).toLowerCase() === String(currentUser.id).toLowerCase()) ||
+    (t.requesterEmail && currentUser?.email && t.requesterEmail.trim().toLowerCase() === currentUser.email.trim().toLowerCase()) ||
+    (t.requesterName && currentUser?.name && t.requesterName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+    (t.requester && currentUser?.name && t.requester.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
+  )
+
+  const reqEmail = t.requesterEmail || (isCurrentUserCreator ? currentUser?.email : '') || ''
+  const reqName = t.requesterName || t.requester || (isCurrentUserCreator ? currentUser?.name : 'Employee')
 
   return {
     ...t,
@@ -44,6 +52,7 @@ export function normalizeBackendTicket(t, currentUser) {
     summary: t.summary || '',
     requester: reqName,
     requesterEmail: reqEmail,
+    requesterId: t.requesterId || (isCurrentUserCreator ? currentUser?.id : null),
     assignee: t.assigneeName || (t.assigneeId ? 'Assigned Agent' : null),
     createdAt: t.createdAt,
     updatedAt: t.resolvedAt || t.createdAt,
@@ -111,8 +120,33 @@ export function TicketProvider({ children }) {
           ? response.data
           : (Array.isArray(response.data?.content) ? response.data.content : [])
 
-        if (!cancelled && Array.isArray(rawList)) {
-          const normalized = rawList.map((item) => normalizeBackendTicket(item, user))
+        let combinedRaw = [...rawList]
+
+        // For non-employees (Manager, Agent, Admin), also fetch personal tickets (mine=true)
+        // so that any tickets they personally raised (even cross-department) are included
+        if (user.role && user.role !== 'ROLE_EMPLOYEE' && user.role !== 'employee') {
+          try {
+            const mineResponse = await api.get('/v1/tickets?mine=true')
+            const mineList = Array.isArray(mineResponse.data)
+              ? mineResponse.data
+              : (Array.isArray(mineResponse.data?.content) ? mineResponse.data.content : [])
+
+            if (Array.isArray(mineList)) {
+              const existingIds = new Set(combinedRaw.map((t) => t.id))
+              for (const item of mineList) {
+                if (!existingIds.has(item.id)) {
+                  combinedRaw.push(item)
+                  existingIds.add(item.id)
+                }
+              }
+            }
+          } catch (mineErr) {
+            console.debug('Failed to fetch personal tickets with mine=true:', mineErr.message)
+          }
+        }
+
+        if (!cancelled && Array.isArray(combinedRaw)) {
+          const normalized = combinedRaw.map((item) => normalizeBackendTicket(item, user))
           setTickets(normalized)
           setBackendConnected(true)
         }
@@ -174,6 +208,7 @@ export function TicketProvider({ children }) {
       status: 'Open',
       requester: user?.name || 'Anonymous',
       requesterEmail: user?.email || '',
+      requesterId: user?.id,
       assignee: null,
       createdAt: now,
       updatedAt: now,

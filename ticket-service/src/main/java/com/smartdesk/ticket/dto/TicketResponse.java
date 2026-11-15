@@ -10,6 +10,6 @@ import java.util.UUID;
 
 public record TicketResponse(Long id, String title, String description, TicketStatus status,
                              Department department, Department category, Priority priority, String summary,
-                             TriageSource triageSource, UUID requesterId, String requesterName,
+                             TriageSource triageSource, UUID requesterId, String requesterName, String requesterEmail,
                              UUID assigneeId, String assigneeName, Long parentTicketId, int reportCount,
                              Instant createdAt, Instant resolvedAt) {}

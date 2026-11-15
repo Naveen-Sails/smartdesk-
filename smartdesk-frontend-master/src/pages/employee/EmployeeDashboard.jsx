@@ -3,6 +3,7 @@ import { ArrowRight, Clock, Plus, Ticket } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useTickets } from '../../features/tickets/useTickets.js'
 import { useAuth } from '../../features/auth/useAuth.js'
+import { isUserTicket } from '../../features/tickets/ticketStore.js'
 import TicketCard from '../../features/tickets/TicketCard.jsx'
 import EmptyState from '../../components/ui/EmptyState.jsx'
 import { fetchMyPendingRequest } from '../../features/auth/accessRequestService.js'
@@ -24,7 +25,7 @@ function EmployeeDashboard() {
     loadMyRequest()
   }, [])
 
-  const myTickets = tickets.filter((ticket) => ticket.requesterEmail === user?.email)
+  const myTickets = tickets.filter((ticket) => isUserTicket(ticket, user))
   const latestTickets = [...myTickets].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).slice(0, 3)
   const summary = [
     { label: 'Open', count: myTickets.filter((ticket) => ticket.status === 'Open').length },
