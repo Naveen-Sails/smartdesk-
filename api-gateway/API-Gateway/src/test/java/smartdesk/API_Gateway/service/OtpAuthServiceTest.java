@@ -52,7 +52,7 @@ class OtpAuthServiceTest {
         activeUser = User.builder()
                 .id(UUID.randomUUID())
                 .fullName("Alice Smith")
-                .email("alice@smartdesk.com")
+                .email("alice@sailssoftware.com")
                 .role(Role.ROLE_EMPLOYEE)
                 .department("Support")
                 .isRootAdmin(false)
@@ -61,10 +61,17 @@ class OtpAuthServiceTest {
     }
 
     @Test
-    void testRequestOtp_UserNotFound_ReturnsSilentlyWithoutCreatingOtp() {
-        when(userRepository.findByEmailIgnoreCase("unknown@smartdesk.com")).thenReturn(Optional.empty());
+    void testRequestOtp_InvalidDomain_ThrowsException() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> otpAuthService.requestOtp("user@otherdomain.com"));
+        assertTrue(ex.getMessage().contains("@sailssoftware.com"));
+    }
 
-        assertDoesNotThrow(() -> otpAuthService.requestOtp("unknown@smartdesk.com"));
+    @Test
+    void testRequestOtp_UserNotFound_ReturnsSilentlyWithoutCreatingOtp() {
+        when(userRepository.findByEmailIgnoreCase("unknown@sailssoftware.com")).thenReturn(Optional.empty());
+
+        assertDoesNotThrow(() -> otpAuthService.requestOtp("unknown@sailssoftware.com"));
 
         verify(otpVerificationRepository, never()).save(any());
         verify(notificationClient, never()).sendOtpNotificationAsync(anyString(), anyString());
@@ -73,9 +80,9 @@ class OtpAuthServiceTest {
     @Test
     void testRequestOtp_UserInactive_ReturnsSilentlyWithoutCreatingOtp() {
         activeUser.setIsActive(false);
-        when(userRepository.findByEmailIgnoreCase("alice@smartdesk.com")).thenReturn(Optional.of(activeUser));
+        when(userRepository.findByEmailIgnoreCase("alice@sailssoftware.com")).thenReturn(Optional.of(activeUser));
 
-        assertDoesNotThrow(() -> otpAuthService.requestOtp("alice@smartdesk.com"));
+        assertDoesNotThrow(() -> otpAuthService.requestOtp("alice@sailssoftware.com"));
 
         verify(otpVerificationRepository, never()).save(any());
         verify(notificationClient, never()).sendOtpNotificationAsync(anyString(), anyString());
@@ -83,11 +90,11 @@ class OtpAuthServiceTest {
 
     @Test
     void testRequestOtp_ActiveUser_Success() {
-        when(userRepository.findByEmailIgnoreCase("alice@smartdesk.com")).thenReturn(Optional.of(activeUser));
+        when(userRepository.findByEmailIgnoreCase("alice@sailssoftware.com")).thenReturn(Optional.of(activeUser));
         when(otpVerificationRepository.findTopByUserOrderByCreatedAtDesc(activeUser)).thenReturn(Optional.empty());
         when(otpVerificationRepository.save(any(OtpVerification.class))).thenAnswer(i -> i.getArgument(0));
 
-        otpAuthService.requestOtp("alice@smartdesk.com");
+        otpAuthService.requestOtp("alice@sailssoftware.com");
 
         verify(otpVerificationRepository).invalidateAllUnusedOtpsForUser(activeUser);
 
@@ -100,19 +107,19 @@ class OtpAuthServiceTest {
         assertFalse(savedOtp.getIsUsed());
         assertTrue(savedOtp.getExpiresAt().isAfter(LocalDateTime.now().plusMinutes(4)));
 
-        verify(notificationClient).sendOtpNotificationAsync(eq("alice@smartdesk.com"), anyString());
+        verify(notificationClient).sendOtpNotificationAsync(eq("alice@sailssoftware.com"), anyString());
     }
 
     @Test
     void testRequestOtp_RateLimitExceeded() {
-        when(userRepository.findByEmailIgnoreCase("alice@smartdesk.com")).thenReturn(Optional.of(activeUser));
+        when(userRepository.findByEmailIgnoreCase("alice@sailssoftware.com")).thenReturn(Optional.of(activeUser));
 
         OtpVerification recentOtp = OtpVerification.builder()
                 .createdAt(LocalDateTime.now().minusSeconds(30))
                 .build();
         when(otpVerificationRepository.findTopByUserOrderByCreatedAtDesc(activeUser)).thenReturn(Optional.of(recentOtp));
 
-        assertThrows(RateLimitException.class, () -> otpAuthService.requestOtp("alice@smartdesk.com"));
+        assertThrows(RateLimitException.class, () -> otpAuthService.requestOtp("alice@sailssoftware.com"));
 
         verify(notificationClient, never()).sendOtpNotificationAsync(anyString(), anyString());
     }
@@ -131,16 +138,16 @@ class OtpAuthServiceTest {
                 .createdAt(LocalDateTime.now().minusSeconds(10))
                 .build();
 
-        when(userRepository.findByEmailIgnoreCase("alice@smartdesk.com")).thenReturn(Optional.of(activeUser));
+        when(userRepository.findByEmailIgnoreCase("alice@sailssoftware.com")).thenReturn(Optional.of(activeUser));
         when(otpVerificationRepository.findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(activeUser))
                 .thenReturn(Optional.of(otpVerification));
 
-        User verifiedUser = otpAuthService.verifyOtp("alice@smartdesk.com", rawOtp);
+        User verifiedUser = otpAuthService.verifyOtp("alice@sailssoftware.com", rawOtp);
 
         assertNotNull(verifiedUser);
-        assertEquals("alice@smartdesk.com", verifiedUser.getEmail());
+        assertEquals("alice@sailssoftware.com", verifiedUser.getEmail());
         assertTrue(otpVerification.getIsUsed());
-        verify(otpVerificationRepository).save(otpVerification);
+        verify(otpVerificationRepository).saveAndFlush(otpVerification);
     }
 
     @Test
@@ -158,17 +165,17 @@ class OtpAuthServiceTest {
                 .createdAt(LocalDateTime.now().minusSeconds(10))
                 .build();
 
-        when(userRepository.findByEmailIgnoreCase("alice@smartdesk.com")).thenReturn(Optional.of(activeUser));
+        when(userRepository.findByEmailIgnoreCase("alice@sailssoftware.com")).thenReturn(Optional.of(activeUser));
         when(otpVerificationRepository.findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(activeUser))
                 .thenReturn(Optional.of(otpVerification));
 
         InvalidOtpException exception = assertThrows(InvalidOtpException.class,
-                () -> otpAuthService.verifyOtp("alice@smartdesk.com", wrongOtp));
+                () -> otpAuthService.verifyOtp("alice@sailssoftware.com", wrongOtp));
 
         assertTrue(exception.getMessage().contains("Attempts remaining: 2"));
         assertEquals(1, otpVerification.getAttemptCount());
         assertFalse(otpVerification.getIsUsed());
-        verify(otpVerificationRepository).save(otpVerification);
+        verify(otpVerificationRepository).saveAndFlush(otpVerification);
     }
 
     @Test
@@ -186,17 +193,17 @@ class OtpAuthServiceTest {
                 .createdAt(LocalDateTime.now().minusSeconds(10))
                 .build();
 
-        when(userRepository.findByEmailIgnoreCase("alice@smartdesk.com")).thenReturn(Optional.of(activeUser));
+        when(userRepository.findByEmailIgnoreCase("alice@sailssoftware.com")).thenReturn(Optional.of(activeUser));
         when(otpVerificationRepository.findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(activeUser))
                 .thenReturn(Optional.of(otpVerification));
 
         InvalidOtpException exception = assertThrows(InvalidOtpException.class,
-                () -> otpAuthService.verifyOtp("alice@smartdesk.com", wrongOtp));
+                () -> otpAuthService.verifyOtp("alice@sailssoftware.com", wrongOtp));
 
         assertTrue(exception.getMessage().contains("locked"));
         assertEquals(3, otpVerification.getAttemptCount());
         assertTrue(otpVerification.getIsUsed());
-        verify(otpVerificationRepository).save(otpVerification);
+        verify(otpVerificationRepository).saveAndFlush(otpVerification);
     }
 
     @Test
@@ -210,27 +217,27 @@ class OtpAuthServiceTest {
                 .createdAt(LocalDateTime.now().minusMinutes(6))
                 .build();
 
-        when(userRepository.findByEmailIgnoreCase("alice@smartdesk.com")).thenReturn(Optional.of(activeUser));
+        when(userRepository.findByEmailIgnoreCase("alice@sailssoftware.com")).thenReturn(Optional.of(activeUser));
         when(otpVerificationRepository.findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(activeUser))
                 .thenReturn(Optional.of(otpVerification));
 
         assertThrows(InvalidOtpException.class,
-                () -> otpAuthService.verifyOtp("alice@smartdesk.com", "123456"));
+                () -> otpAuthService.verifyOtp("alice@sailssoftware.com", "123456"));
 
         assertTrue(otpVerification.getIsUsed());
-        verify(otpVerificationRepository).save(otpVerification);
+        verify(otpVerificationRepository).saveAndFlush(otpVerification);
     }
 
     @Test
     void testRequestRegistrationOtp_NewUser_Success() {
         smartdesk.API_Gateway.dto.RegisterRequestDTO request = smartdesk.API_Gateway.dto.RegisterRequestDTO.builder()
                 .fullName("Bob Ross")
-                .email("bob@smartdesk.com")
+                .email("bob@sailssoftware.com")
                 .role(Role.ROLE_EMPLOYEE)
                 .department("Facilities")
                 .build();
 
-        when(userRepository.findByEmailIgnoreCase("bob@smartdesk.com")).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase("bob@sailssoftware.com")).thenReturn(Optional.empty());
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
         when(otpVerificationRepository.findTopByUserOrderByCreatedAtDesc(any(User.class))).thenReturn(Optional.empty());
         when(otpVerificationRepository.save(any(OtpVerification.class))).thenAnswer(i -> i.getArgument(0));
@@ -241,19 +248,19 @@ class OtpAuthServiceTest {
         verify(userRepository).save(userCaptor.capture());
         User createdUser = userCaptor.getValue();
         assertFalse(createdUser.getIsActive()); // Inactive pending verification
-        assertEquals("bob@smartdesk.com", createdUser.getEmail());
+        assertEquals("bob@sailssoftware.com", createdUser.getEmail());
 
-        verify(notificationClient).sendOtpNotificationAsync(eq("bob@smartdesk.com"), anyString());
+        verify(notificationClient).sendOtpNotificationAsync(eq("bob@sailssoftware.com"), anyString());
     }
 
     @Test
     void testRequestRegistrationOtp_AlreadyActiveUser_ThrowsException() {
         smartdesk.API_Gateway.dto.RegisterRequestDTO request = smartdesk.API_Gateway.dto.RegisterRequestDTO.builder()
                 .fullName("Alice Smith")
-                .email("alice@smartdesk.com")
+                .email("alice@sailssoftware.com")
                 .build();
 
-        when(userRepository.findByEmailIgnoreCase("alice@smartdesk.com")).thenReturn(Optional.of(activeUser));
+        when(userRepository.findByEmailIgnoreCase("alice@sailssoftware.com")).thenReturn(Optional.of(activeUser));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> otpAuthService.requestRegistrationOtp(request));
@@ -266,7 +273,7 @@ class OtpAuthServiceTest {
         User inactiveUser = User.builder()
                 .id(UUID.randomUUID())
                 .fullName("Bob Ross")
-                .email("bob@smartdesk.com")
+                .email("bob@sailssoftware.com")
                 .role(Role.ROLE_EMPLOYEE)
                 .isActive(false)
                 .build();
@@ -280,16 +287,16 @@ class OtpAuthServiceTest {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        when(userRepository.findByEmailIgnoreCase("bob@smartdesk.com")).thenReturn(Optional.of(inactiveUser));
+        when(userRepository.findByEmailIgnoreCase("bob@sailssoftware.com")).thenReturn(Optional.of(inactiveUser));
         when(otpVerificationRepository.findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(inactiveUser))
                 .thenReturn(Optional.of(otpVerification));
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
 
-        User result = otpAuthService.verifyRegistrationOtp("bob@smartdesk.com", "654321");
+        User result = otpAuthService.verifyRegistrationOtp("bob@sailssoftware.com", "654321");
 
         assertTrue(result.getIsActive()); // Successfully activated
         assertTrue(otpVerification.getIsUsed());
         verify(userRepository).save(inactiveUser);
-        verify(otpVerificationRepository).save(otpVerification);
+        verify(otpVerificationRepository).saveAndFlush(otpVerification);
     }
 }

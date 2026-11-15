@@ -54,19 +54,32 @@ function AuthFormPage({ role = ROLES.EMPLOYEE, mode }) {
   async function handleRequestCode(event) {
     event?.preventDefault()
     setError('')
+
+    const sanitizedEmail = form.email.trim().toLowerCase()
+    if (!sanitizedEmail) {
+      setError('Please enter your email address.')
+      return
+    }
+
+    if (!sanitizedEmail.endsWith('@sailssoftware.com')) {
+      setError('Only @sailssoftware.com email addresses are allowed.')
+      toast.error('Only @sailssoftware.com company emails are permitted.')
+      return
+    }
+
     setLoading(true)
 
     try {
       if (isSignup) {
         await requestRegistrationOtp({
           name: form.name,
-          email: form.email,
+          email: sanitizedEmail,
           role: activeRole,
           department: isDepartmentRole ? form.department : 'IT',
         })
         toast.success('Registration code dispatched. Check your inbox or Gateway terminal.')
       } else {
-        await requestOtp(form.email)
+        await requestOtp(sanitizedEmail)
         toast.success('Verification code dispatched. Check your inbox or Gateway terminal.')
       }
       setStep('otp')
@@ -183,12 +196,13 @@ function AuthFormPage({ role = ROLES.EMPLOYEE, mode }) {
                 className="h-11 w-full rounded-lg border border-neutral-200 pl-10 pr-3 text-sm outline-none placeholder:text-neutral-400 focus:border-neutral-400"
                 name="email"
                 onChange={updateField}
-                placeholder="you@smartdesk.com"
+                placeholder="name@sailssoftware.com"
                 required
                 type="email"
                 value={form.email}
               />
             </span>
+            <p className="text-[11px] text-neutral-400">Must be an official @sailssoftware.com email address.</p>
           </label>
 
           {isSignup && isDepartmentRole && (
@@ -264,7 +278,8 @@ function AuthFormPage({ role = ROLES.EMPLOYEE, mode }) {
               <input
                 autoComplete="one-time-code"
                 autoFocus
-                className="h-11 w-full rounded-lg border border-neutral-200 pl-10 pr-3 text-center text-lg font-mono tracking-widest outline-none placeholder:text-neutral-300 focus:border-neutral-400"
+                className="h-11 w-full rounded-lg border border-neutral-200 pl-10 pr-3 text-center text-lg font-mono tracking-widest outline-none placeholder:text-neutral-300 focus:border-neutral-400 disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                disabled={error && (error.toLowerCase().includes('locked') || error.toLowerCase().includes('limit exceeded'))}
                 maxLength={6}
                 name="otp"
                 onChange={updateField}
@@ -280,11 +295,24 @@ function AuthFormPage({ role = ROLES.EMPLOYEE, mode }) {
             For local testing, the OTP code is displayed in the <strong>API Gateway</strong> console log.
           </p>
 
-          {error && <p aria-live="polite" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+          {error && (
+            <div aria-live="polite" className="rounded-lg bg-red-50 p-3 text-xs text-red-700 space-y-1.5">
+              <p>{error}</p>
+              {(error.toLowerCase().includes('locked') || error.toLowerCase().includes('limit exceeded')) && (
+                <button
+                  className="inline-flex items-center gap-1 font-medium text-red-800 underline hover:text-red-950 mt-1 cursor-pointer"
+                  onClick={() => { setStep('email'); setForm((f) => ({ ...f, otp: '' })); setError(''); }}
+                  type="button"
+                >
+                  <ArrowLeft size={13} /> Request a new verification code
+                </button>
+              )}
+            </div>
+          )}
 
           <button
             className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-neutral-900 text-sm font-medium text-white transition hover:bg-neutral-700 disabled:opacity-50"
-            disabled={loading || form.otp.trim().length !== 6}
+            disabled={loading || form.otp.trim().length !== 6 || (error && (error.toLowerCase().includes('locked') || error.toLowerCase().includes('limit exceeded')))}
             type="submit"
           >
             {loading ? <RotateCw className="animate-spin" size={16} /> : null}

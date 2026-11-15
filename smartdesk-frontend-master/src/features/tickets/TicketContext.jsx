@@ -248,6 +248,14 @@ export function TicketProvider({ children }) {
       })
     }
 
+    if (existingTicket && updates.status === 'Resolved' && existingTicket.status !== 'Resolved') {
+      addMockNotification({
+        userEmail: existingTicket.requesterEmail,
+        title: 'Action required: Confirm ticket resolution',
+        message: `Support has marked ${existingTicket.id} as resolved. Please review and confirm the resolution.`,
+      })
+    }
+
     // Extract raw numeric backend ID if exists (e.g. "SD-1" -> 1)
     const rawId = typeof ticketId === 'string' && ticketId.startsWith('SD-')
       ? parseInt(ticketId.replace('SD-', ''), 10)
@@ -261,6 +269,9 @@ export function TicketProvider({ children }) {
         if (res.data) backendUpdated = normalizeBackendTicket(res.data, user)
       } else if (updates.status === 'Closed' && existingTicket?.status === 'Resolved') {
         const res = await api.post(`/v1/tickets/${rawId}/verify`, { accepted: true })
+        if (res.data) backendUpdated = normalizeBackendTicket(res.data, user)
+      } else if (updates.status === 'In Progress' && existingTicket?.status === 'Resolved') {
+        const res = await api.post(`/v1/tickets/${rawId}/verify`, { accepted: false })
         if (res.data) backendUpdated = normalizeBackendTicket(res.data, user)
       } else if (updates.status) {
         const res = await api.patch(`/v1/tickets/${rawId}/status`, { status: toBackendStatus(updates.status) })
@@ -279,12 +290,14 @@ export function TicketProvider({ children }) {
       if (ticket.id !== ticketId) return ticket
 
       const statusActivity = updates.status === 'Resolved'
-        ? 'Marked as resolved. Waiting for employee acknowledgement.'
+        ? 'Marked as resolved. Waiting for requester acknowledgement.'
         : updates.status === 'Closed'
           ? 'Acknowledged the resolution and closed the ticket.'
-          : updates.status === 'Waiting on employee'
-            ? 'Requested an update from the employee.'
-            : `Status changed to ${updates.status}.`
+          : updates.status === 'In Progress' && updates.reopenReason
+            ? `Reopened ticket: ${updates.reopenReason}`
+            : updates.status === 'Waiting on employee'
+              ? 'Requested an update from the employee.'
+              : `Status changed to ${updates.status}.`
       const activity = updates.status && updates.status !== ticket.status
         ? [{ author: user.name, message: statusActivity, createdAt: now, kind: 'status' }, ...ticket.activity]
         : updates.assignee && updates.assignee !== ticket.assignee

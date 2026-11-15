@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Send, UserRound } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CheckCircle2, RotateCcw, Send, UserRound } from 'lucide-react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ROLES } from '../../context/roles.js'
@@ -98,6 +98,10 @@ function TicketDetailPage() {
   const canUpdate = role === ROLES.AGENT && ticket.assignee === user.name && ticket.status !== 'Closed'
   const canComment = ticket.status !== 'Closed' && (canUpdate || role === ROLES.EMPLOYEE || isRequester)
 
+  const [showResolveConfirmModal, setShowResolveConfirmModal] = useState(false)
+  const [showReopenBox, setShowReopenBox] = useState(false)
+  const [reopenReason, setReopenReason] = useState('')
+
   function handleComment(event) {
     event.preventDefault()
     if (!comment.trim()) return
@@ -106,12 +110,20 @@ function TicketDetailPage() {
   }
 
   function handleStatusChange(event) {
-    if (event.target.value !== ticket.status) {
-      toast.success(event.target.value === 'Resolved'
-        ? 'Marked resolved. Employee acknowledgement is required before closing.'
-        : `Ticket status changed to ${event.target.value}.`)
+    const nextStatus = event.target.value
+    if (nextStatus === ticket.status) return
+    if (nextStatus === 'Resolved') {
+      setShowResolveConfirmModal(true)
+      return
     }
-    updateTicket(ticket.id, { status: event.target.value })
+    updateTicket(ticket.id, { status: nextStatus })
+    toast.success(`Ticket status changed to ${nextStatus}.`)
+  }
+
+  function confirmMarkResolved() {
+    updateTicket(ticket.id, { status: 'Resolved' })
+    toast.success('Marked as Resolved. Requester has been notified to verify and acknowledge resolution.')
+    setShowResolveConfirmModal(false)
   }
 
   function handleAssign() {
@@ -123,7 +135,21 @@ function TicketDetailPage() {
 
   function handleAcknowledgeResolution() {
     updateTicket(ticket.id, { status: 'Closed', acknowledgedBy: user.name })
-    toast.success('Resolution acknowledged. Ticket closed.')
+    toast.success('Resolution confirmed. Ticket is now Closed.')
+  }
+
+  function handleReopenTicket(event) {
+    event.preventDefault()
+    if (!reopenReason.trim()) return
+    updateTicket(ticket.id, {
+      status: 'In Progress',
+      reopenedBy: user.name,
+      reopenReason: reopenReason.trim(),
+    })
+    addComment(ticket.id, `Requester reopened ticket: ${reopenReason.trim()}`, user.name)
+    toast.success('Ticket reopened and returned to In Progress.')
+    setShowReopenBox(false)
+    setReopenReason('')
   }
 
   return (
@@ -240,11 +266,62 @@ function TicketDetailPage() {
 
           {(isRequester || role === ROLES.EMPLOYEE) && ticket.status === 'Resolved' && (
             <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-              <h2 className="text-sm font-semibold text-emerald-900">Please confirm the resolution</h2>
-              <p className="mt-1 text-xs leading-5 text-emerald-800">Review the agent’s update. Acknowledging it will close this ticket.</p>
-              <button className="mt-3 h-9 w-full rounded-lg bg-emerald-700 px-3 text-xs font-medium text-white hover:bg-emerald-800" onClick={handleAcknowledgeResolution} type="button">
-                Acknowledge and close
-              </button>
+              <div className="flex items-center gap-2 text-emerald-900">
+                <CheckCircle2 size={16} />
+                <h2 className="text-sm font-semibold">Resolution Acknowledgement</h2>
+              </div>
+              <p className="mt-1.5 text-xs leading-5 text-emerald-800">
+                Support has marked this request as resolved. Has your issue been resolved to your satisfaction?
+              </p>
+              <div className="mt-4 space-y-2">
+                <button
+                  className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-xs font-medium text-white hover:bg-emerald-800 transition"
+                  onClick={handleAcknowledgeResolution}
+                  type="button"
+                >
+                  <CheckCircle2 size={14} /> Yes, Confirm & Close
+                </button>
+                {!showReopenBox ? (
+                  <button
+                    className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-3 text-xs font-medium text-emerald-800 hover:bg-emerald-100/60 transition"
+                    onClick={() => setShowReopenBox(true)}
+                    type="button"
+                  >
+                    <RotateCcw size={13} /> No, Issue Still Persists (Reopen)
+                  </button>
+                ) : (
+                  <div className="mt-2 space-y-2 border-t border-emerald-200 pt-2.5">
+                    <label className="block text-xs font-medium text-emerald-900" htmlFor="reopen-reason">
+                      Why does this still need attention?
+                    </label>
+                    <textarea
+                      className="w-full rounded-lg border border-emerald-300 bg-white p-2 text-xs outline-none focus:border-emerald-500"
+                      id="reopen-reason"
+                      onChange={(e) => setReopenReason(e.target.value)}
+                      placeholder="Describe what still needs attention..."
+                      rows={2}
+                      value={reopenReason}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        className="flex-1 rounded-lg bg-red-600 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 transition"
+                        disabled={!reopenReason.trim()}
+                        onClick={handleReopenTicket}
+                        type="button"
+                      >
+                        Reopen Ticket
+                      </button>
+                      <button
+                        className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50 transition"
+                        onClick={() => setShowReopenBox(false)}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </section>
           )}
 
@@ -255,6 +332,41 @@ function TicketDetailPage() {
           )}
         </aside>
       </div>
+
+      {showResolveConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-neutral-200">
+            <div className="flex items-center gap-3 text-neutral-900">
+              <div className="grid size-10 place-items-center rounded-full bg-emerald-100 text-emerald-700">
+                <CheckCircle2 size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold">Mark Request as Resolved?</h3>
+                <p className="text-xs text-neutral-500">Requires Requester Acknowledgement</p>
+              </div>
+            </div>
+            <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
+              Moving this request to <strong>Resolved</strong> notifies the user to verify whether their issue has been resolved. The ticket will remain pending their confirmation before officially closing.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2.5">
+              <button
+                className="rounded-lg border border-neutral-200 px-3.5 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition"
+                onClick={() => setShowResolveConfirmModal(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-emerald-700 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-800 transition"
+                onClick={confirmMarkResolved}
+                type="button"
+              >
+                Yes, mark resolved & request acknowledgement
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

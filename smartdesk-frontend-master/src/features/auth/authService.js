@@ -45,6 +45,9 @@ export async function requestOtpCode(email) {
   if (!normalizedEmail) {
     throw new Error('Please enter a valid email address.')
   }
+  if (!normalizedEmail.endsWith('@sailssoftware.com')) {
+    throw new Error('Please enter a valid @sailssoftware.com company email address.')
+  }
 
   try {
     const response = await api.post('/v1/auth/otp/request', { email: normalizedEmail })
@@ -125,6 +128,9 @@ export async function requestRegistrationOtp({ name, email, role, department }) 
   }
   if (!normalizedEmail) {
     throw new Error('Email address is required.')
+  }
+  if (!normalizedEmail.endsWith('@sailssoftware.com')) {
+    throw new Error('Registration is restricted to @sailssoftware.com company email addresses.')
   }
 
   try {

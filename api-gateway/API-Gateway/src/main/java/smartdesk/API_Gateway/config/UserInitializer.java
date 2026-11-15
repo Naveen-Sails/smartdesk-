@@ -63,8 +63,23 @@ public class UserInitializer implements CommandLineRunner {
                 });
             }
 
-            // 2. Ensure strictly ONE Root Admin account exists (pre-seeded: adminsails@gmail.com)
-            String soleAdminEmail = "adminsails@gmail.com";
+            // 2. Ensure strictly ONE Root Admin account exists (pre-seeded: admin@sailssoftware.com)
+            String soleAdminEmail = "admin@sailssoftware.com";
+
+            // Migrate legacy adminsails@gmail.com to admin@sailssoftware.com if present
+            userRepository.findByEmailIgnoreCase("adminsails@gmail.com").ifPresent(legacyAdmin -> {
+                if (userRepository.findByEmailIgnoreCase(soleAdminEmail).isEmpty()) {
+                    legacyAdmin.setEmail(soleAdminEmail);
+                    legacyAdmin.setRole(Role.ROLE_ADMIN);
+                    legacyAdmin.setIsRootAdmin(true);
+                    legacyAdmin.setIsActive(true);
+                    userRepository.save(legacyAdmin);
+                    log.info("Migrated legacy root admin from adminsails@gmail.com to {}", soleAdminEmail);
+                } else {
+                    userRepository.delete(legacyAdmin);
+                }
+            });
+
             seedUser(soleAdminEmail, "Moka Naveen", Role.ROLE_ADMIN, "Engineering", true);
 
             // 3. Demote or reassign any duplicate admin accounts so exactly ONE admin exists

@@ -42,6 +42,14 @@ public class OtpAuthServiceImpl implements OtpAuthService {
         String sanitizedEmail = (email != null) ? email.trim().toLowerCase() : "";
         log.info("Processing OTP request for email: {}", sanitizedEmail);
 
+        if (sanitizedEmail.isBlank()) {
+            throw new IllegalArgumentException("Email is required.");
+        }
+
+        if (!sanitizedEmail.endsWith("@sailssoftware.com")) {
+            throw new IllegalArgumentException("Only @sailssoftware.com email addresses are authorized.");
+        }
+
         Optional<User> userOptional = userRepository.findByEmailIgnoreCase(sanitizedEmail);
 
         // Prevent email enumeration: return generic success if user does not exist or is inactive
@@ -97,7 +105,7 @@ public class OtpAuthServiceImpl implements OtpAuthService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = InvalidOtpException.class)
     public User verifyOtp(String email, String otp) {
         String sanitizedEmail = (email != null) ? email.trim().toLowerCase() : "";
         log.info("Verifying OTP for email: {}", sanitizedEmail);
@@ -108,20 +116,28 @@ public class OtpAuthServiceImpl implements OtpAuthService {
 
         OtpVerification otpVerification = otpVerificationRepository
                 .findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(user)
-                .orElseThrow(() -> new InvalidOtpException("No active OTP found. Please request a new OTP."));
+                .orElseGet(() -> {
+                    // Check if previous OTP reached attempt limit
+                    Optional<OtpVerification> last = otpVerificationRepository.findTopByUserOrderByCreatedAtDesc(user);
+                    if (last.isPresent() && (last.get().getAttemptCount() >= 3 || Boolean.TRUE.equals(last.get().getIsUsed()))) {
+                        log.warn("OTP verification attempt on locked code for user: {}", sanitizedEmail);
+                        throw new InvalidOtpException("Maximum verification attempts exceeded (3/3). This code is locked. Please request a new OTP.");
+                    }
+                    throw new InvalidOtpException("No active OTP found. Please request a new OTP.");
+                });
 
         // Check if maximum attempts reached
         if (otpVerification.getAttemptCount() >= 3) {
             otpVerification.setIsUsed(true);
-            otpVerificationRepository.save(otpVerification);
+            otpVerificationRepository.saveAndFlush(otpVerification);
             log.warn("OTP verification rejected: max attempts exceeded for user: {}", sanitizedEmail);
-            throw new InvalidOtpException("Maximum verification attempts exceeded. Please request a new OTP.");
+            throw new InvalidOtpException("Maximum verification attempts exceeded (3/3). This code is locked. Please request a new OTP.");
         }
 
         // Check if OTP is expired
         if (LocalDateTime.now().isAfter(otpVerification.getExpiresAt())) {
             otpVerification.setIsUsed(true);
-            otpVerificationRepository.save(otpVerification);
+            otpVerificationRepository.saveAndFlush(otpVerification);
             log.warn("OTP verification rejected: OTP expired for user: {}", sanitizedEmail);
             throw new InvalidOtpException("OTP has expired. Please request a new OTP.");
         }
@@ -133,12 +149,12 @@ public class OtpAuthServiceImpl implements OtpAuthService {
             if (attempts >= 3) {
                 otpVerification.setIsUsed(true);
             }
-            otpVerificationRepository.save(otpVerification);
+            otpVerificationRepository.saveAndFlush(otpVerification);
 
-            int remaining = 3 - attempts;
+            int remaining = Math.max(0, 3 - attempts);
             log.warn("Incorrect OTP entered for user: {}. Attempts remaining: {}", sanitizedEmail, remaining);
             if (remaining <= 0) {
-                throw new InvalidOtpException("Invalid OTP. Attempt limit exceeded. Code locked.");
+                throw new InvalidOtpException("Invalid OTP. Attempt limit exceeded (3/3). Code locked. Please request a new OTP.");
             } else {
                 throw new InvalidOtpException("Invalid OTP. Attempts remaining: " + remaining);
             }
@@ -146,7 +162,7 @@ public class OtpAuthServiceImpl implements OtpAuthService {
 
         // Mark OTP as used and save
         otpVerification.setIsUsed(true);
-        otpVerificationRepository.save(otpVerification);
+        otpVerificationRepository.saveAndFlush(otpVerification);
         log.info("OTP verification successful for user: {}", sanitizedEmail);
 
         return user;
@@ -160,6 +176,10 @@ public class OtpAuthServiceImpl implements OtpAuthService {
 
         if (sanitizedEmail.isBlank()) {
             throw new IllegalArgumentException("Email is required for registration.");
+        }
+
+        if (!sanitizedEmail.endsWith("@sailssoftware.com")) {
+            throw new IllegalArgumentException("Registration is restricted to @sailssoftware.com email addresses.");
         }
 
         Optional<User> existingUserOpt = userRepository.findByEmailIgnoreCase(sanitizedEmail);
@@ -255,7 +275,7 @@ public class OtpAuthServiceImpl implements OtpAuthService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = InvalidOtpException.class)
     public User verifyRegistrationOtp(String email, String otp) {
         String sanitizedEmail = (email != null) ? email.trim().toLowerCase() : "";
         log.info("Verifying registration OTP for email: {}", sanitizedEmail);
@@ -265,20 +285,27 @@ public class OtpAuthServiceImpl implements OtpAuthService {
 
         OtpVerification otpVerification = otpVerificationRepository
                 .findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(user)
-                .orElseThrow(() -> new InvalidOtpException("No active verification code found. Please request a new code."));
+                .orElseGet(() -> {
+                    Optional<OtpVerification> last = otpVerificationRepository.findTopByUserOrderByCreatedAtDesc(user);
+                    if (last.isPresent() && (last.get().getAttemptCount() >= 3 || Boolean.TRUE.equals(last.get().getIsUsed()))) {
+                        log.warn("Registration OTP verification attempt on locked code for user: {}", sanitizedEmail);
+                        throw new InvalidOtpException("Maximum verification attempts exceeded (3/3). This code is locked. Please request a new verification code.");
+                    }
+                    throw new InvalidOtpException("No active verification code found. Please request a new code.");
+                });
 
         // Check if maximum attempts reached
         if (otpVerification.getAttemptCount() >= 3) {
             otpVerification.setIsUsed(true);
-            otpVerificationRepository.save(otpVerification);
+            otpVerificationRepository.saveAndFlush(otpVerification);
             log.warn("Registration OTP rejected: max attempts exceeded for user: {}", sanitizedEmail);
-            throw new InvalidOtpException("Maximum verification attempts exceeded. Please request a new verification code.");
+            throw new InvalidOtpException("Maximum verification attempts exceeded (3/3). This code is locked. Please request a new verification code.");
         }
 
         // Check if OTP is expired
         if (LocalDateTime.now().isAfter(otpVerification.getExpiresAt())) {
             otpVerification.setIsUsed(true);
-            otpVerificationRepository.save(otpVerification);
+            otpVerificationRepository.saveAndFlush(otpVerification);
             log.warn("Registration OTP rejected: OTP expired for user: {}", sanitizedEmail);
             throw new InvalidOtpException("Verification code has expired. Please request a new code.");
         }
@@ -290,12 +317,12 @@ public class OtpAuthServiceImpl implements OtpAuthService {
             if (attempts >= 3) {
                 otpVerification.setIsUsed(true);
             }
-            otpVerificationRepository.save(otpVerification);
+            otpVerificationRepository.saveAndFlush(otpVerification);
 
-            int remaining = 3 - attempts;
+            int remaining = Math.max(0, 3 - attempts);
             log.warn("Incorrect registration OTP entered for user: {}. Attempts remaining: {}", sanitizedEmail, remaining);
             if (remaining <= 0) {
-                throw new InvalidOtpException("Invalid verification code. Attempt limit exceeded. Code locked.");
+                throw new InvalidOtpException("Invalid verification code. Attempt limit exceeded (3/3). Code locked. Please request a new code.");
             } else {
                 throw new InvalidOtpException("Invalid verification code. Attempts remaining: " + remaining);
             }
@@ -303,7 +330,7 @@ public class OtpAuthServiceImpl implements OtpAuthService {
 
         // Mark OTP as used and activate the user
         otpVerification.setIsUsed(true);
-        otpVerificationRepository.save(otpVerification);
+        otpVerificationRepository.saveAndFlush(otpVerification);
 
         user.setIsActive(true);
         User activatedUser = userRepository.save(user);
