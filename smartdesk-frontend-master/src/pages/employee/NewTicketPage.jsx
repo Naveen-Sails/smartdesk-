@@ -3,11 +3,20 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useTickets } from '../../features/tickets/useTickets.js'
+import { useAuth } from '../../features/auth/useAuth.js'
+import { ROLE_NAVIGATION } from '../../routes/navigation.js'
+import { ROLES } from '../../context/roles.js'
 
 function NewTicketPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { createTicket } = useTickets()
   const [form, setForm] = useState({ title: '', description: '' })
+
+  const role = user?.role || ROLES.EMPLOYEE
+  const roleNav = ROLE_NAVIGATION[role] || ROLE_NAVIGATION[ROLES.EMPLOYEE]
+  const basePath = role === ROLES.ADMIN ? '/admin' : role === ROLES.MANAGER ? '/manager' : role === ROLES.AGENT ? '/agent' : '/employee'
+  const backTicketsPath = role === ROLES.EMPLOYEE ? '/employee/tickets' : `${basePath}/my-requests`
 
   function updateField(event) {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }))
@@ -19,7 +28,7 @@ function NewTicketPage() {
       const ticket = await createTicket(form)
       if (ticket && ticket.id) {
         toast.success(`${ticket.id} routed to ${ticket.department || 'IT'} support.`)
-        navigate(`/employee/tickets/${ticket.id}`)
+        navigate(`${basePath}/tickets/${ticket.id}`)
       } else {
         toast.error('Could not create ticket. Please try again.')
       }
@@ -30,11 +39,11 @@ function NewTicketPage() {
 
   return (
     <section className="mx-auto w-full max-w-3xl px-6 py-9 sm:px-10 sm:py-11">
-      <Link className="inline-flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900" to="/employee/tickets">
-        <ArrowLeft size={16} /> Back to my tickets
+      <Link className="inline-flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900" to={backTicketsPath}>
+        <ArrowLeft size={16} /> Back to my requests
       </Link>
       <div className="mt-6">
-        <p className="text-sm font-medium text-neutral-500">Employee workspace</p>
+        <p className="text-sm font-medium text-neutral-500">{roleNav.label} workspace</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-neutral-900">Create a support request</h1>
         <p className="mt-2 text-sm text-neutral-500">Describe what you need help with. SmartDesk will suggest a department, category, summary, and priority.</p>
       </div>

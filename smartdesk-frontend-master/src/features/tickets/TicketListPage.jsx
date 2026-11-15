@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Search, Ticket } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { Plus, Search, Ticket } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
 import { useTickets } from './useTickets.js'
 import { useAuth } from '../auth/useAuth.js'
 import { ROLES } from '../../context/roles.js'
@@ -17,7 +17,7 @@ function TicketListPage({ mode, title, description }) {
 
   const visibleTickets = useMemo(() => {
     const scopedTickets = tickets.filter((ticket) => {
-      if (mode === 'employee') return ticket.requesterEmail === user.email
+      if (mode === 'employee') return ticket.requesterEmail === user.email || ticket.requester === user.name || ticket.requesterId === user.id
       if (mode === 'assigned') return ticket.assignee === user.name && ticket.department === user.department
       if (mode === 'queue') return !ticket.assignee && !['Resolved', 'Closed'].includes(ticket.status) && ticket.department === user.department
       if (mode === 'all' && user.role === ROLES.MANAGER) return ticket.department === user.department
@@ -31,6 +31,10 @@ function TicketListPage({ mode, title, description }) {
   }, [mode, search, status, tickets, user.department, user.email, user.name, user.role])
 
   function detailPath(ticketId) {
+    if (pathname.includes('/my-requests')) {
+      const base = user?.role === ROLES.ADMIN ? '/admin' : user?.role === ROLES.MANAGER ? '/manager' : user?.role === ROLES.AGENT ? '/agent' : '/employee'
+      return `${base}/my-requests/${ticketId}`
+    }
     if (pathname.startsWith('/employee')) return `/employee/tickets/${ticketId}`
     if (pathname.startsWith('/manager')) return `/manager/tickets/${ticketId}`
     if (pathname.startsWith('/admin')) return `/admin/tickets/${ticketId}`
@@ -38,6 +42,14 @@ function TicketListPage({ mode, title, description }) {
       ? `/agent/queue/${ticketId}`
       : `/agent/tickets/${ticketId}`
   }
+
+  const newTicketPath = user?.role === ROLES.ADMIN
+    ? '/admin/new'
+    : user?.role === ROLES.MANAGER
+      ? '/manager/new'
+      : user?.role === ROLES.AGENT
+        ? '/agent/new'
+        : '/employee/new'
 
   return (
     <section className="mx-auto w-full max-w-6xl px-6 py-9 sm:px-10 sm:py-11">
@@ -47,7 +59,15 @@ function TicketListPage({ mode, title, description }) {
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-neutral-900">{title}</h1>
           <p className="mt-2 text-sm text-neutral-500">{description}</p>
         </div>
-        <div className="text-sm text-neutral-500">{visibleTickets.length} {visibleTickets.length === 1 ? 'ticket' : 'tickets'}</div>
+        <div className="flex items-center gap-4">
+          <Link
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-neutral-900 px-3.5 text-xs font-medium text-white transition hover:bg-neutral-800"
+            to={newTicketPath}
+          >
+            <Plus size={14} /> New request
+          </Link>
+          <div className="text-sm text-neutral-500">{visibleTickets.length} {visibleTickets.length === 1 ? 'ticket' : 'tickets'}</div>
+        </div>
       </div>
 
       <div className="mt-7 flex flex-col gap-3 sm:flex-row">

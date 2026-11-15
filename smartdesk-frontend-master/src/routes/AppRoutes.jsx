@@ -54,6 +54,13 @@ function TicketRedirect() {
   return <Navigate replace to={`${prefix}/tickets/${ticketId}`} />
 }
 
+function NewRedirect() {
+  const { user } = useAuth()
+  if (!user) return <Navigate replace to="/" />
+  const prefix = user.role === ROLES.AGENT ? '/agent' : user.role === ROLES.MANAGER ? '/manager' : user.role === ROLES.ADMIN ? '/admin' : '/employee'
+  return <Navigate replace to={`${prefix}/new`} />
+}
+
 function NotFoundPage() {
   return (
     <main className="grid min-h-svh place-items-center bg-white px-6 text-center">
@@ -88,12 +95,18 @@ function WorkspaceRoutes() {
             <Route element={<TicketDetailPage />} path="queue/:ticketId" />
             <Route element={<TicketListPage description="Tickets currently assigned to you." mode="assigned" title="My assigned tickets" />} path="tickets" />
             <Route element={<TicketDetailPage />} path="tickets/:ticketId" />
+            <Route element={<TicketListPage description="Track updates on requests you have submitted." mode="employee" title="My requests" />} path="my-requests" />
+            <Route element={<TicketDetailPage />} path="my-requests/:ticketId" />
+            <Route element={<NewTicketPage />} path="new" />
           </Route>
           <Route element={<RequireRole allowedRole={ROLES.MANAGER} />} path="manager">
             <Route element={<Suspense fallback={<PageLoading />}><ManagerDashboard /></Suspense>} index />
             <Route element={<TeamPage />} path="team" />
             <Route element={<TicketListPage description="Review all requests across support." mode="all" title="All tickets" />} path="tickets" />
             <Route element={<TicketDetailPage />} path="tickets/:ticketId" />
+            <Route element={<TicketListPage description="Track updates on requests you have submitted." mode="employee" title="My requests" />} path="my-requests" />
+            <Route element={<TicketDetailPage />} path="my-requests/:ticketId" />
+            <Route element={<NewTicketPage />} path="new" />
             <Route element={<Suspense fallback={<PageLoading />}><ReportsPage /></Suspense>} path="reports" />
           </Route>
           <Route element={<RequireRole allowedRole={ROLES.ADMIN} />} path="admin">
@@ -101,10 +114,14 @@ function WorkspaceRoutes() {
             <Route element={<TeamPage />} path="team" />
             <Route element={<TicketListPage description="Review requests across every department." mode="all" title="All tickets" />} path="tickets" />
             <Route element={<TicketDetailPage />} path="tickets/:ticketId" />
+            <Route element={<TicketListPage description="Track updates on requests you have submitted." mode="employee" title="My requests" />} path="my-requests" />
+            <Route element={<TicketDetailPage />} path="my-requests/:ticketId" />
+            <Route element={<NewTicketPage />} path="new" />
             <Route element={<Suspense fallback={<PageLoading />}><ReportsPage /></Suspense>} path="reports" />
           </Route>
           <Route element={<QueueRedirect />} path="queue" />
           <Route element={<TicketRedirect />} path="tickets/:ticketId" />
+          <Route element={<NewRedirect />} path="new" />
         </Route>
       </Route>
       <Route element={<NotFoundPage />} path="*" />
